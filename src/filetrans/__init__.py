@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 __author__ = 'sxwxs'
-__date__ = '2020-02-19'
+__date__ = '2022-08-09'
 
 import os
 import sys
@@ -179,6 +179,10 @@ def server_worker(s, address):
     if mode == b'GET':
         filename = read_line(s).decode('utf8')
         send_file(s, filename)
+    elif mode == b'PUT':
+        filename = read_line(s).decode('utf8')
+        total_size = int(read_line(s).decode('utf8'))
+        get_file(s, filename, total_size)
 
 def server_main(port, target, key):
     s = socket.socket()
@@ -341,15 +345,20 @@ def get_file(s, local_filename, total_size):
             recv_and_write(s, f, cur_size, recv_size, total_size)
     print('Finished')
 
-def client_worker(s, remote_filename, local_filename):
-    # set GET mode
-    send_line(s, 'GET')
-    send_line(s, remote_filename)
-    ######
-    total_size = int(read_line(s).decode('utf8'))
-    get_file(s, local_filename, total_size)
+def client_worker(s, remote_filename, local_filename, mode):
+    if mode == 'get':
+        # set GET mode
+        send_line(s, 'GET')
+        send_line(s, remote_filename)
+        ######
+        total_size = int(read_line(s).decode('utf8'))
+        get_file(s, local_filename, total_size)
+    elif mode == 'put':
+        send_line(s, 'PUT')
+        send_line(s, remote_filename)
+        send_file(s, local_filename)
 
-def client_main(address, port, key, filename):
+def client_main(address, port, key, filename, mode):
     s = socket.socket()
     s.connect((address, port))
     send_line(s, key)
@@ -365,7 +374,8 @@ def client_main(address, port, key, filename):
                 break
             client_worker(s, filename, filename)
     else:
-        client_worker(s, filename, filename)
+        client_worker(s, filename, filename, mode)
+        
 
 def main():
     global HASH_LOG
@@ -374,6 +384,7 @@ def main():
     parser.add_argument('-p', type=int, metavar="Port", help='Port for connect or listen to', default='14605')
     parser.add_argument('-f', type=str, metavar="Target file (or Dir)", help='Path to target file / dir', default='')
     parser.add_argument('-k', type=str, metavar="Secret key", help='Secret key', default='')
+    parser.add_argument('-m', type=str, metavar="mode", help='get / put / ls', default='get')
     parser.add_argument('--hashlog', action='store_true', help='Write hash to log')
     args = parser.parse_args()
     print(args)
@@ -381,7 +392,7 @@ def main():
     if args.a == '':
         server_main(args.p, args.f, args.k)
     else:
-        client_main(args.a, args.p, args.k, args.f)
+        client_main(args.a, args.p, args.k, args.f, args.m)
 
 
 if __name__ == '__main__':
